@@ -12,6 +12,7 @@ const router = createRouter({
       children: [
         { path: '', name: 'dashboard', component: () => import('@/pages/Dashboard.vue') },
         { path: 'plots', name: 'plots', component: () => import('@/pages/PlotMap.vue') },
+        { path: 'transfers', name: 'transfers', component: () => import('@/pages/PlotTransfers.vue') },
         { path: 'plans', name: 'plans', component: () => import('@/pages/PlantingPlan.vue') },
         { path: 'diaries', name: 'diaries', component: () => import('@/pages/Diary.vue') },
         { path: 'harvests', name: 'harvests', component: () => import('@/pages/Harvest.vue') },

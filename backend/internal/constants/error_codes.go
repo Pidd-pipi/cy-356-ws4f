@@ -22,6 +22,9 @@ const (
 	CodeDuplicateUsername    = 2007
 	CodeInvalidCredentials   = 2008
 	CodeUserDisabled         = 2009
+	CodeTransferNotPending   = 2010 // 转交申请已被处理（核准/撤回竞争中后到的一方）
+	CodeTransferDuplicate    = 2011 // 该地块已存在待处理的转交申请
+	CodeTransferPlotState    = 2012 // 地块当前状态不允许提交转交申请
 )
 
 // ErrorText 错误码默认文案（service/handler 可覆盖拼接更具体的 message）
@@ -44,4 +47,7 @@ var ErrorText = map[int]string{
 	CodeDuplicateUsername: "用户名已被占用",
 	CodeInvalidCredentials: "用户名或密码错误",
 	CodeUserDisabled:      "账号已被禁用",
+	CodeTransferNotPending: "转交申请已处理，请勿重复操作",
+	CodeTransferDuplicate:  "该地块已有待处理的转交申请",
+	CodeTransferPlotState:  "地块当前状态不允许提交转交申请",
 }

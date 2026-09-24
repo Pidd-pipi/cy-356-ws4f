@@ -138,7 +138,7 @@ func (s *PlotService) Adopt(plotID, userID uint, role, username string) (*model.
 	return adopted, nil
 }
 
-// Release 释放地块（管理员或认养人，harvested -> available）。
+// Release 释放地块（仅管理员直接释放；认养人须走转交申请流程，防止农忙误点直接回到共享池）。
 func (s *PlotService) Release(plotID, operatorID uint, operatorRole string) (*model.Plot, error) {
 	var released *model.Plot
 	err := s.db.Transaction(func(tx *gorm.DB) error {
@@ -149,8 +149,8 @@ func (s *PlotService) Release(plotID, operatorID uint, operatorRole string) (*mo
 			}
 			return util.NewAppError(constants.CodeInternalError, 500, constants.ErrorText[constants.CodeInternalError]).Wrap(err)
 		}
-		if operatorRole != string(constants.RoleAdmin) && (plot.AdopterID == nil || *plot.AdopterID != operatorID) {
-			return util.NewAppError(constants.CodeForbidden, 403, fmt.Sprintf("角色 %s 无权释放地块 %s", util.RoleText(operatorRole), plot.Code))
+		if operatorRole != string(constants.RoleAdmin) {
+			return util.NewAppError(constants.CodeForbidden, 403, fmt.Sprintf("角色 %s 无权直接释放地块 %s：%s", util.RoleText(operatorRole), plot.Code, constants.MsgTransferGoApply))
 		}
 		if plot.Status != string(constants.PlotStatusHarvested) {
 			return util.NewAppError(constants.CodePlotNotAvailable, 409, fmt.Sprintf("地块 %s 当前状态为 %s，仅待释放状态可释放", plot.Code, util.PlotStatusText(plot.Status)))
@@ -171,10 +171,14 @@ func (s *PlotService) Release(plotID, operatorID uint, operatorRole string) (*mo
 }
 
 // MarkHarvested 种植计划完成后将地块置为待释放（harvested）。
+// 地块处于转交审核中（transfer_pending）时跳过，避免覆盖转交申请流程持有的状态。
 func (s *PlotService) MarkHarvested(tx *gorm.DB, plotID uint) error {
 	plot, err := s.plotRepo.FindByIDForUpdate(tx, plotID)
 	if err != nil {
 		return err
+	}
+	if plot.Status == string(constants.PlotStatusTransferPending) {
+		return nil
 	}
 	plot.Status = string(constants.PlotStatusHarvested)
 	return s.plotRepo.UpdateWithTx(tx, plot)

@@ -25,9 +25,20 @@ const (
 type PlotStatus string
 
 const (
-	PlotStatusAvailable PlotStatus = "available" // 空闲可认养
-	PlotStatusAdopted   PlotStatus = "adopted"   // 已认养
-	PlotStatusHarvested PlotStatus = "harvested" // 已收成待释放
+	PlotStatusAvailable       PlotStatus = "available"        // 空闲可认养
+	PlotStatusAdopted         PlotStatus = "adopted"          // 已认养
+	PlotStatusHarvested       PlotStatus = "harvested"        // 已收成待释放
+	PlotStatusTransferPending PlotStatus = "transfer_pending" // 转交申请审核中（不可被认养）
+)
+
+// TransferStatus 地块转交申请状态机：pending -> approved / rejected / cancelled
+type TransferStatus string
+
+const (
+	TransferPending   TransferStatus = "pending"   // 待处理
+	TransferApproved  TransferStatus = "approved"  // 已核准（地块清空认养关系回到共享池）
+	TransferRejected  TransferStatus = "rejected"  // 已驳回（地块恢复申请前状态）
+	TransferCancelled TransferStatus = "cancelled" // 已撤回（申请人撤回，地块恢复申请前状态）
 )
 
 // SoilType 土壤类型

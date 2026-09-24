@@ -39,13 +39,33 @@
       <el-table-column label="认养人" width="120">
         <template #default="{ row }">{{ row.adopter?.nickname || row.adopter?.username || '-' }}</template>
       </el-table-column>
-      <el-table-column label="操作" width="220">
+      <el-table-column label="操作" width="240">
         <template #default="{ row }">
           <el-button v-if="row.status === 'available'" type="success" size="small" @click="adopt(row)">认养</el-button>
+          <el-tag v-if="row.status === 'transfer_pending'" type="danger" size="small">转交审核中，暂不可认养</el-tag>
+          <el-button v-if="canApplyTransfer(row)" type="warning" size="small" @click="openTransfer(row)">申请转交</el-button>
           <el-button v-if="canRelease(row)" type="warning" size="small" @click="release(row)">释放</el-button>
         </template>
       </el-table-column>
     </DataTable>
+
+    <el-dialog v-model="transferVisible" title="申请地块转交" width="480px">
+      <el-alert type="info" :closable="false" style="margin-bottom: 12px"
+        title="提交后地块进入转交审核中，管理员核准后才会清空认养关系并回到共享池；待处理期间可随时撤回。" />
+      <el-form label-width="90px">
+        <el-form-item label="地块">
+          <span>{{ transferTarget?.name }}（{{ transferTarget?.code }}）</span>
+        </el-form-item>
+        <el-form-item label="接管理由" required>
+          <el-input v-model="transferReason" type="textarea" :rows="3" maxlength="500" show-word-limit
+            placeholder="请填写转交/接管理由，例如：农忙无暇打理，希望转交给其他居民" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="transferVisible = false">取消</el-button>
+        <el-button type="primary" :loading="transferring" @click="submitTransfer">提交申请</el-button>
+      </template>
+    </el-dialog>
 
     <el-dialog v-model="createVisible" title="新增地块（管理员）" width="520px">
       <el-form :model="createForm" label-width="90px">
@@ -78,7 +98,8 @@
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { usePlotStore } from '@/stores/plot'
-import { createPlot, type Plot } from '@/api/plot'
+import { createPlot, releasePlot, type Plot } from '@/api/plot'
+import { submitTransferRequest } from '@/api/plotTransfer'
 import { useAuth } from '@/hooks/useAuth'
 import { usePagination } from '@/hooks/usePagination'
 import DataTable from '@/components/DataTable.vue'
@@ -88,11 +109,16 @@ import { formatArea, clamp } from '@/utils/format'
 
 const store = usePlotStore()
 const pagination = usePagination()
-const { user, role, isAdmin } = useAuth()
+const { user, isAdmin } = useAuth()
 
 const createVisible = ref(false)
 const creating = ref(false)
 const createForm = reactive({ name: '', code: '', area: 10, soil_type: 'loam', sunlight: 'full', latitude: 31.2304, longitude: 121.4737, description: '' })
+
+const transferVisible = ref(false)
+const transferring = ref(false)
+const transferReason = ref('')
+const transferTarget = ref<Plot | null>(null)
 
 const mapW = 600
 const mapH = 360
@@ -107,6 +133,7 @@ function mapY(p: Plot) {
 function colorOf(status: string) {
   if (status === 'available') return '#67c23a'
   if (status === 'adopted') return '#e6a23c'
+  if (status === 'transfer_pending') return '#f56c6c'
   return '#909399'
 }
 
@@ -120,7 +147,35 @@ async function fetch() {
 }
 
 function canRelease(row: Plot) {
-  return row.status === 'harvested' && (role.value === 'admin' || row.adopter_id === user.value?.id)
+  // 仅管理员可直接释放；认养人须走转交申请流程，防止误点直接回到共享池
+  return row.status === 'harvested' && isAdmin.value
+}
+
+function canApplyTransfer(row: Plot) {
+  return (row.status === 'adopted' || row.status === 'harvested') && row.adopter_id === user.value?.id
+}
+
+function openTransfer(row: Plot) {
+  transferTarget.value = row
+  transferReason.value = ''
+  transferVisible.value = true
+}
+
+async function submitTransfer() {
+  if (!transferTarget.value) return
+  if (transferReason.value.trim().length < 2) {
+    ElMessage.warning('请填写接管理由（至少 2 个字）')
+    return
+  }
+  transferring.value = true
+  try {
+    await submitTransferRequest(transferTarget.value.id, transferReason.value.trim())
+    ElMessage.success('转交申请已提交，等待管理员核准')
+    transferVisible.value = false
+    await fetch()
+  } finally {
+    transferring.value = false
+  }
 }
 
 async function adopt(row: Plot) {
@@ -139,7 +194,6 @@ async function release(row: Plot) {
   } catch {
     return
   }
-  const { releasePlot } = await import('@/api/plot')
   await releasePlot(row.id)
   ElMessage.success('地块已释放')
   await fetch()

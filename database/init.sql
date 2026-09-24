@@ -32,6 +32,20 @@ CREATE TABLE IF NOT EXISTS plots (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS plot_transfer_requests (
+    id BIGSERIAL PRIMARY KEY,
+    plot_id BIGINT NOT NULL REFERENCES plots(id),
+    applicant_id BIGINT NOT NULL REFERENCES users(id),
+    reason VARCHAR(500) NOT NULL,
+    status VARCHAR(32) NOT NULL DEFAULT 'pending',
+    prev_plot_status VARCHAR(32) NOT NULL,
+    review_comment VARCHAR(500),
+    reviewer_id BIGINT REFERENCES users(id),
+    reviewed_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS planting_plans (
     id BIGSERIAL PRIMARY KEY,
     plot_id BIGINT NOT NULL REFERENCES plots(id),
@@ -119,6 +133,9 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 );
 
 CREATE INDEX IF NOT EXISTS idx_plots_status ON plots(status);
+CREATE INDEX IF NOT EXISTS idx_transfer_plot ON plot_transfer_requests(plot_id);
+CREATE INDEX IF NOT EXISTS idx_transfer_applicant ON plot_transfer_requests(applicant_id);
+CREATE INDEX IF NOT EXISTS idx_transfer_status ON plot_transfer_requests(status);
 CREATE INDEX IF NOT EXISTS idx_plans_user ON planting_plans(user_id);
 CREATE INDEX IF NOT EXISTS idx_plans_status ON planting_plans(status);
 CREATE INDEX IF NOT EXISTS idx_harvest_user ON harvest_records(user_id);

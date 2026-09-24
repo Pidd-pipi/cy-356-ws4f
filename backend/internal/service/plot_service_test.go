@@ -46,16 +46,16 @@ func TestPlotService_Release(t *testing.T) {
 	db := newTestServiceDB(t)
 	svc, _ := newPlotService(t, db)
 	owner := newTestUser(t, db, "farmer", "farmer")
-	other := newTestUser(t, db, "citizen2", "citizen")
+	admin := newTestUser(t, db, "admin", "admin")
 	uid := owner.ID
 	plot := newTestPlot(t, db, "P-REL", "harvested", &uid)
 
-	// 非认养人不能释放
-	if _, err := svc.Release(plot.ID, other.ID, "citizen"); err == nil {
-		t.Fatalf("expected forbidden error for non-owner")
+	// 认养人不可直接释放（须走转交申请流程，防止误点直接回到共享池）
+	if _, err := svc.Release(plot.ID, owner.ID, "farmer"); err == nil {
+		t.Fatalf("expected forbidden error for adopter direct release")
 	}
-	// 认养人可释放
-	got, err := svc.Release(plot.ID, owner.ID, "farmer")
+	// 管理员可直接释放
+	got, err := svc.Release(plot.ID, admin.ID, "admin")
 	if err != nil {
 		t.Fatalf("Release: %v", err)
 	}

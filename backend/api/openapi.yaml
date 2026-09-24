@@ -8,6 +8,7 @@ servers:
 tags:
   - name: auth
   - name: plots
+  - name: transfer-requests
   - name: planting-plans
   - name: harvests
   - name: diaries
@@ -52,7 +53,37 @@ paths:
   /plots/{id}/release:
     post:
       tags: [plots]
-      summary: 释放地块
+      summary: 释放地块（仅管理员直接释放；认养人须走转交申请流程）
+      responses: { '200': { description: 成功 } }
+  /plots/{id}/transfer-requests:
+    post:
+      tags: [plots]
+      summary: 认养人提交地块转交申请（填写接管理由，地块进入转交审核中）
+      responses: { '200': { description: 成功 } }
+  /transfer-requests:
+    get:
+      tags: [transfer-requests]
+      summary: 转交申请列表（管理员全部 / 认养人自己的，?status= 过滤）
+      responses: { '200': { description: 成功 } }
+  /transfer-requests/{id}:
+    get:
+      tags: [transfer-requests]
+      summary: 转交申请详情（申请人本人或管理员，含申请原因/处理意见/当前状态）
+      responses: { '200': { description: 成功 } }
+  /transfer-requests/{id}/approve:
+    post:
+      tags: [transfer-requests]
+      summary: 管理员核准（清空原认养关系，地块回到共享池；仅 pending 可处理）
+      responses: { '200': { description: 成功 } }
+  /transfer-requests/{id}/reject:
+    post:
+      tags: [transfer-requests]
+      summary: 管理员驳回（必填处理意见，地块恢复申请前状态）
+      responses: { '200': { description: 成功 } }
+  /transfer-requests/{id}/cancel:
+    post:
+      tags: [transfer-requests]
+      summary: 申请人撤回待处理申请（与核准并发时只接受先完成的一次）
       responses: { '200': { description: 成功 } }
   /planting-plans:
     get:
