@@ -13,6 +13,7 @@ import (
 
 	"github.com/communitygarden/server/internal/config"
 	"github.com/communitygarden/server/internal/constants"
+	"github.com/communitygarden/server/internal/database/migrations"
 	"github.com/communitygarden/server/internal/model"
 	"github.com/communitygarden/server/internal/util"
 )
@@ -21,6 +22,7 @@ import (
 var Models = []interface{}{
 	&model.User{},
 	&model.Plot{},
+	&model.PlotTransfer{},
 	&model.PlantingPlan{},
 	&model.HarvestRecord{},
 	&model.DiaryEntry{},
@@ -50,6 +52,10 @@ func Connect(cfg *config.Config, logger *slog.Logger) (*gorm.DB, error) {
 		return nil, err
 	}
 	logger.Info(constants.LogDBMigrateDone, "tables", len(Models))
+
+	if err := migrations.ApplyCustomIndexes(db, logger); err != nil {
+		return nil, err
+	}
 
 	if err := Seed(db, logger); err != nil {
 		return nil, err

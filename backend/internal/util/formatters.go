@@ -43,6 +43,24 @@ func PlotStatusText(s string) string {
 		return "已认养"
 	case constants.PlotStatusHarvested:
 		return "待释放"
+	case constants.PlotStatusPendingTransfer:
+		return "转交审核中"
+	default:
+		return "未知状态"
+	}
+}
+
+// TransferStatusText 转交申请状态中文文本。
+func TransferStatusText(s string) string {
+	switch constants.TransferStatus(s) {
+	case constants.TransferPending:
+		return "待处理"
+	case constants.TransferApproved:
+		return "已核准"
+	case constants.TransferRejected:
+		return "已驳回"
+	case constants.TransferWithdrawn:
+		return "已撤回"
 	default:
 		return "未知状态"
 	}

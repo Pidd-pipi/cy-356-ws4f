@@ -9,6 +9,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 
+	"github.com/communitygarden/server/internal/database/migrations"
 	"github.com/communitygarden/server/internal/model"
 )
 
@@ -30,11 +31,14 @@ func newTestDB(t *testing.T) *gorm.DB {
 		t.Fatalf("open test db: %v", err)
 	}
 	if err := db.AutoMigrate(
-		&model.User{}, &model.Plot{}, &model.PlantingPlan{}, &model.HarvestRecord{},
+		&model.User{}, &model.Plot{}, &model.PlotTransfer{}, &model.PlantingPlan{}, &model.HarvestRecord{},
 		&model.DiaryEntry{}, &model.DiaryComment{}, &model.CommunityPost{}, &model.CommunityComment{},
 		&model.AuditLog{},
 	); err != nil {
 		t.Fatalf("migrate test db: %v", err)
+	}
+	if err := migrations.ApplyCustomIndexes(db, nil); err != nil {
+		t.Fatalf("apply custom indexes: %v", err)
 	}
 	return db
 }

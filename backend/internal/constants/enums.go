@@ -25,9 +25,20 @@ const (
 type PlotStatus string
 
 const (
-	PlotStatusAvailable PlotStatus = "available" // 空闲可认养
-	PlotStatusAdopted   PlotStatus = "adopted"   // 已认养
-	PlotStatusHarvested PlotStatus = "harvested" // 已收成待释放
+	PlotStatusAvailable       PlotStatus = "available"        // 空闲可认养
+	PlotStatusAdopted         PlotStatus = "adopted"          // 已认养
+	PlotStatusHarvested       PlotStatus = "harvested"        // 已收成待释放
+	PlotStatusPendingTransfer PlotStatus = "pending_transfer" // 转交申请待核准（其他居民不可认养）
+)
+
+// TransferStatus 地块转交申请状态机：pending -> approved / rejected / withdrawn
+type TransferStatus string
+
+const (
+	TransferPending   TransferStatus = "pending"   // 待管理员处理
+	TransferApproved  TransferStatus = "approved"  // 管理员核准，地块回到共享池
+	TransferRejected  TransferStatus = "rejected"  // 管理员驳回，认养关系保留
+	TransferWithdrawn TransferStatus = "withdrawn" // 认养人撤回，认养关系保留
 )
 
 // SoilType 土壤类型
@@ -124,4 +135,23 @@ var SeasonCrops = map[Season][]string{
 	SeasonSummer: {"番茄", "黄瓜", "茄子", "辣椒", "西瓜", "罗勒"},
 	SeasonAutumn: {"白菜", "胡萝卜", "南瓜", "苹果", "迷迭香", "大蒜"},
 	SeasonWinter: {"羽衣甘蓝", "韭菜", "芹菜", "薄荷", "卷心菜", "洋葱"},
+}
+
+// TransferStatusTransitions 转交申请状态机（service 核准/撤回并发判定 +
+// 前端按钮显隐 + 日志模板 + formatters + 错误码多处定义）。
+var TransferStatusTransitions = map[TransferStatus][]TransferStatus{
+	TransferPending:   {TransferApproved, TransferRejected, TransferWithdrawn},
+	TransferApproved:  {},
+	TransferRejected:  {},
+	TransferWithdrawn: {},
+}
+
+// CanTransferTo 判断当前申请状态是否允许流转到目标状态。
+func CanTransferTo(from, to TransferStatus) bool {
+	for _, s := range TransferStatusTransitions[from] {
+		if s == to {
+			return true
+		}
+	}
+	return false
 }

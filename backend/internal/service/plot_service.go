@@ -16,17 +16,18 @@ import (
 
 // PlotService 地块服务（认养使用事务 + SELECT FOR UPDATE）。
 type PlotService struct {
-	plotRepo repository.PlotRepository
-	db       *gorm.DB
-	logger   *slog.Logger
+	plotRepo     repository.PlotRepository
+	transferRepo repository.PlotTransferRepository
+	db           *gorm.DB
+	logger       *slog.Logger
 }
 
 // NewPlotService 构造地块服务。
-func NewPlotService(plotRepo repository.PlotRepository, db *gorm.DB, logger *slog.Logger) *PlotService {
-	return &PlotService{plotRepo: plotRepo, db: db, logger: logger}
+func NewPlotService(plotRepo repository.PlotRepository, transferRepo repository.PlotTransferRepository, db *gorm.DB, logger *slog.Logger) *PlotService {
+	return &PlotService{plotRepo: plotRepo, transferRepo: transferRepo, db: db, logger: logger}
 }
 
-// GetByID 查询地块详情（被地块 handler 与种植计划 service 复用）。
+// GetByID 查询地块详情（被地块 handler 与种植计划 service 复用），附带最近一条转交申请。
 func (s *PlotService) GetByID(id uint) (*model.Plot, error) {
 	p, err := s.plotRepo.FindByID(id)
 	if err != nil {
@@ -34,6 +35,11 @@ func (s *PlotService) GetByID(id uint) (*model.Plot, error) {
 			return nil, util.NewAppError(constants.CodeNotFound, 404, fmt.Sprintf("地块实体 id=%d 不存在", id))
 		}
 		return nil, util.NewAppError(constants.CodeInternalError, 500, constants.ErrorText[constants.CodeInternalError]).Wrap(err)
+	}
+	if latest, lerr := s.transferRepo.FindLatestByPlot(id); lerr == nil {
+		p.LatestTransfer = latest
+	} else if !errors.Is(lerr, repository.ErrNotFound) {
+		return nil, util.NewAppError(constants.CodeInternalError, 500, constants.ErrorText[constants.CodeInternalError]).Wrap(lerr)
 	}
 	return p, nil
 }
@@ -100,11 +106,24 @@ func (s *PlotService) Update(id uint, req *dto.UpdatePlotRequest, operator strin
 	return p, nil
 }
 
-// List 分页查询地块（可过滤状态）。
+// List 分页查询地块（可过滤状态），并批量挂载每个地块最近一条转交申请。
 func (s *PlotService) List(pq util.PageQuery, status string) ([]model.Plot, int64, error) {
 	plots, total, err := s.plotRepo.List(pq, status)
 	if err != nil {
 		return nil, 0, util.NewAppError(constants.CodeInternalError, 500, constants.ErrorText[constants.CodeInternalError]).Wrap(err)
+	}
+	ids := make([]uint, 0, len(plots))
+	for i := range plots {
+		ids = append(ids, plots[i].ID)
+	}
+	latest, err := s.transferRepo.FindLatestByPlotIDs(ids)
+	if err != nil {
+		return nil, 0, util.NewAppError(constants.CodeInternalError, 500, constants.ErrorText[constants.CodeInternalError]).Wrap(err)
+	}
+	for i := range plots {
+		if t, ok := latest[plots[i].ID]; ok {
+			plots[i].LatestTransfer = t
+		}
 	}
 	return plots, total, nil
 }
@@ -119,6 +138,10 @@ func (s *PlotService) Adopt(plotID, userID uint, role, username string) (*model.
 				return util.NewAppError(constants.CodeNotFound, 404, fmt.Sprintf("地块实体 id=%d 不存在", plotID))
 			}
 			return util.NewAppError(constants.CodeInternalError, 500, constants.ErrorText[constants.CodeInternalError]).Wrap(err)
+		}
+		// 转交申请待核准期间，其他居民不能认养该地块。
+		if plot.Status == string(constants.PlotStatusPendingTransfer) {
+			return util.NewAppError(constants.CodeTransferPending, 409, fmt.Sprintf("地块 %s 转交申请待核准，暂不可认养", plot.Code))
 		}
 		if plot.Status != string(constants.PlotStatusAvailable) {
 			return util.NewAppError(constants.CodePlotNotAvailable, 409, fmt.Sprintf("地块 %s 当前状态为 %s，不可认养", plot.Code, util.PlotStatusText(plot.Status)))
@@ -138,7 +161,7 @@ func (s *PlotService) Adopt(plotID, userID uint, role, username string) (*model.
 	return adopted, nil
 }
 
-// Release 释放地块（管理员或认养人，harvested -> available）。
+// Release 强制释放地块（仅管理员；认养人须走转交申请流程，见 PlotTransferService.Submit）。
 func (s *PlotService) Release(plotID, operatorID uint, operatorRole string) (*model.Plot, error) {
 	var released *model.Plot
 	err := s.db.Transaction(func(tx *gorm.DB) error {
@@ -149,8 +172,8 @@ func (s *PlotService) Release(plotID, operatorID uint, operatorRole string) (*mo
 			}
 			return util.NewAppError(constants.CodeInternalError, 500, constants.ErrorText[constants.CodeInternalError]).Wrap(err)
 		}
-		if operatorRole != string(constants.RoleAdmin) && (plot.AdopterID == nil || *plot.AdopterID != operatorID) {
-			return util.NewAppError(constants.CodeForbidden, 403, fmt.Sprintf("角色 %s 无权释放地块 %s", util.RoleText(operatorRole), plot.Code))
+		if operatorRole != string(constants.RoleAdmin) {
+			return util.NewAppError(constants.CodeForbidden, 403, fmt.Sprintf("角色 %s 无权直接释放地块 %s，请提交转交申请由管理员核准", util.RoleText(operatorRole), plot.Code))
 		}
 		if plot.Status != string(constants.PlotStatusHarvested) {
 			return util.NewAppError(constants.CodePlotNotAvailable, 409, fmt.Sprintf("地块 %s 当前状态为 %s，仅待释放状态可释放", plot.Code, util.PlotStatusText(plot.Status)))
@@ -171,10 +194,14 @@ func (s *PlotService) Release(plotID, operatorID uint, operatorRole string) (*mo
 }
 
 // MarkHarvested 种植计划完成后将地块置为待释放（harvested）。
+// 若地块正处于转交申请待核准状态，则保持 pending_transfer，避免打断审批流程。
 func (s *PlotService) MarkHarvested(tx *gorm.DB, plotID uint) error {
 	plot, err := s.plotRepo.FindByIDForUpdate(tx, plotID)
 	if err != nil {
 		return err
+	}
+	if plot.Status == string(constants.PlotStatusPendingTransfer) {
+		return nil
 	}
 	plot.Status = string(constants.PlotStatusHarvested)
 	return s.plotRepo.UpdateWithTx(tx, plot)

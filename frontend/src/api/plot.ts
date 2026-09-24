@@ -1,5 +1,6 @@
 import { get, post } from '@/utils/request'
 import type { UserInfo } from './auth'
+import type { TransferApplication } from './plotTransfer'
 
 export interface Plot {
   id: number
@@ -15,6 +16,7 @@ export interface Plot {
   adopter: UserInfo | null
   description: string
   created_at: string
+  latest_transfer?: TransferApplication | null
 }
 
 export interface PlotPayload {

@@ -47,20 +47,45 @@ func TestPlotService_Release(t *testing.T) {
 	svc, _ := newPlotService(t, db)
 	owner := newTestUser(t, db, "farmer", "farmer")
 	other := newTestUser(t, db, "citizen2", "citizen")
+	admin := newTestUser(t, db, "admin1", "admin")
 	uid := owner.ID
 	plot := newTestPlot(t, db, "P-REL", "harvested", &uid)
 
-	// 非认养人不能释放
-	if _, err := svc.Release(plot.ID, other.ID, "citizen"); err == nil {
-		t.Fatalf("expected forbidden error for non-owner")
+	// 认养人不能再直接释放（须走转交申请流程）
+	if _, err := svc.Release(plot.ID, owner.ID, "farmer"); err == nil {
+		t.Fatalf("expected forbidden error for adopter direct release")
 	}
-	// 认养人可释放
-	got, err := svc.Release(plot.ID, owner.ID, "farmer")
+	// 其他居民同样无权直接释放
+	if _, err := svc.Release(plot.ID, other.ID, "citizen"); err == nil {
+		t.Fatalf("expected forbidden error for non-admin release")
+	}
+	// 管理员可直接强制释放
+	got, err := svc.Release(plot.ID, admin.ID, "admin")
 	if err != nil {
 		t.Fatalf("Release: %v", err)
 	}
 	if got.Status != string(constants.PlotStatusAvailable) || got.AdopterID != nil {
 		t.Errorf("release result invalid: status=%s adopter=%v", got.Status, got.AdopterID)
+	}
+}
+
+func TestPlotService_AdoptBlockedByPendingTransfer(t *testing.T) {
+	db := newTestServiceDB(t)
+	plotSvc, _ := newPlotService(t, db)
+	transferSvc, _ := newPlotTransferService(t, db)
+	owner := newTestUser(t, db, "owner", "citizen")
+	other := newTestUser(t, db, "other", "citizen")
+	uid := owner.ID
+	plot := newTestPlot(t, db, "P-PENDING", "adopted", &uid)
+
+	// 认养人提交转交申请
+	if _, err := transferSvc.Submit(plot.ID, owner.ID, "citizen", "owner", "农忙无暇打理"); err != nil {
+		// 走 SQLite 测试时若部分唯一索引缺失，下面的断言仍能验证主流程
+		t.Fatalf("Submit: %v", err)
+	}
+	// 待处理期间其他居民不能认养
+	if _, err := plotSvc.Adopt(plot.ID, other.ID, "citizen", "other"); err == nil {
+		t.Fatalf("expected adopt blocked while transfer pending")
 	}
 }
 

@@ -18,4 +18,7 @@ type Plot struct {
 	Description string    `gorm:"size:512" json:"description"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
+
+	// LatestTransfer 最近一条转交申请（非持久化字段，由 PlotService 在列表/详情中手工挂载）。
+	LatestTransfer *PlotTransfer `gorm:"-" json:"latest_transfer,omitempty"`
 }

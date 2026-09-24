@@ -10,6 +10,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 
+	"github.com/communitygarden/server/internal/database/migrations"
 	"github.com/communitygarden/server/internal/model"
 	"github.com/communitygarden/server/internal/repository"
 )
@@ -32,11 +33,14 @@ func newTestServiceDB(t *testing.T) *gorm.DB {
 		t.Fatalf("open test db: %v", err)
 	}
 	if err := db.AutoMigrate(
-		&model.User{}, &model.Plot{}, &model.PlantingPlan{}, &model.HarvestRecord{},
+		&model.User{}, &model.Plot{}, &model.PlotTransfer{}, &model.PlantingPlan{}, &model.HarvestRecord{},
 		&model.DiaryEntry{}, &model.DiaryComment{}, &model.CommunityPost{}, &model.CommunityComment{},
 		&model.AuditLog{},
 	); err != nil {
 		t.Fatalf("migrate: %v", err)
+	}
+	if err := migrations.ApplyCustomIndexes(db, nil); err != nil {
+		t.Fatalf("apply custom indexes: %v", err)
 	}
 	return db
 }
@@ -72,6 +76,16 @@ func newTestPlot(t *testing.T, db *gorm.DB, code, status string, adopterID *uint
 func newPlotService(t *testing.T, db *gorm.DB) (*PlotService, repository.PlotRepository) {
 	t.Helper()
 	plotRepo := repository.NewPlotRepository(db)
-	svc := NewPlotService(plotRepo, db, testLogger())
+	transferRepo := repository.NewPlotTransferRepository(db)
+	svc := NewPlotService(plotRepo, transferRepo, db, testLogger())
 	return svc, plotRepo
+}
+
+// newPlotTransferService 构造转交申请服务（测试用）。
+func newPlotTransferService(t *testing.T, db *gorm.DB) (*PlotTransferService, repository.PlotTransferRepository) {
+	t.Helper()
+	plotRepo := repository.NewPlotRepository(db)
+	transferRepo := repository.NewPlotTransferRepository(db)
+	svc := NewPlotTransferService(transferRepo, plotRepo, db, testLogger())
+	return svc, transferRepo
 }

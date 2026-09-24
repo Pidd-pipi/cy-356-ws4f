@@ -28,7 +28,7 @@ docker compose up -d --build
 
 ## ✨ 主要功能
 
-1. **地块认养与 GIS 展示**：地图展示地块分布，标注空闲/已认养/待释放状态，展示面积、土壤类型、日照条件，在线认养。
+1. **地块认养与 GIS 展示**：地图展示地块分布，标注空闲/已认养/待释放/转交审核中状态，展示面积、土壤类型、日照条件，在线认养。认养人不再直接释放地块，而是在地块列表**填写接管理由提交转交申请**，管理员核准后才清空原认养关系；核准前本人可撤回，管理员可写明意见驳回，待处理期间其他居民不能认养。
 2. **种植计划与作物推荐**：认养后制定种植计划，按季节推荐适宜作物，生成预期收获时间线（蔬菜 45 天/水果 90 天/香草 35 天）。
 3. **种植日记图文记录**：按播种/浇水/施肥/除虫/收成记录种植过程，支持点赞与评论。
 4. **收成预警与采摘提醒**：近 7 天成熟作物自动提醒，记录采摘重量与品质，生成年度收成统计报表。
@@ -98,6 +98,7 @@ README.md
 | --- | --- | --- | --- |
 | 用户 User | `users` | `model/user.go`、`repository/user_repository.go`、`service/user_service.go`、`handler/user_handler.go`、`router/user.go` | `api/auth.ts`、`stores/auth.ts`、`pages/Login.vue`、`pages/Register.vue` |
 | 地块 Plot | `plots` | `model/plot.go`、`repository/plot_repository.go`、`service/plot_service.go`、`handler/plot_handler.go`、`router/plot.go` | `api/plot.ts`、`stores/plot.ts`、`pages/PlotMap.vue` |
+| 转交申请 PlotTransfer | `plot_transfers` | `model/plot_transfer.go`、`repository/plot_transfer_repository.go`、`service/plot_transfer_service.go`、`handler/plot_transfer_handler.go`、`router/plot_transfer.go` | `api/plotTransfer.ts`、`stores/plotTransfer.ts`、`pages/TransferApplications.vue` |
 | 种植计划 PlantingPlan | `planting_plans` | `model/planting_plan.go`、`repository/planting_plan_repository.go`、`service/planting_plan_service.go`、`handler/planting_plan_handler.go`、`router/planting_plan.go` | `api/plantingPlan.ts`、`stores/plantingPlan.ts`、`pages/PlantingPlan.vue` |
 | 收成记录 HarvestRecord | `harvest_records` | `model/harvest_record.go`、`repository/harvest_record_repository.go`、`service/harvest_record_service.go`、`handler/harvest_handler.go`、`router/harvest.go` | `api/harvest.ts`、`pages/Harvest.vue` |
 | 种植日记 DiaryEntry | `diary_entries` / `diary_comments` | `model/diary_entry.go`、`repository/diary_entry_repository.go`、`service/diary_service.go`、`handler/diary_handler.go`、`router/diary.go` | `api/diary.ts`、`stores/diary.ts`、`pages/Diary.vue` |
@@ -116,7 +117,8 @@ README.md
 | 枚举 | 取值 | 后端出现位置 |
 | --- | --- | --- |
 | RoleType 角色 | admin / farmer / citizen | `constants/enums.go`、`model/user.go`、`dto/user_dto.go`、`service/user_service.go`（ChangeRole 校验）、`middleware/rbac.go`、`middleware/audit.go`、`handler/planting_plan_handler.go`、`handler/harvest_handler.go`、`handler/diary_handler.go`、`util/formatters.go`、`log_templates.go`、`error_codes.go`、`database/database.go`（种子数据） |
-| PlotStatus 地块状态 | available / adopted / harvested | `constants/enums.go`、`model/plot.go`、`dto/plot_dto.go`、`service/plot_service.go`（认养/释放状态机）、`repository/plot_repository.go`（过滤）、`util/formatters.go`、`log_templates.go`、`database/database.go`（种子数据）、`api/openapi.yaml` |
+| PlotStatus 地块状态 | available / adopted / harvested / pending_transfer | `constants/enums.go`、`model/plot.go`、`dto/plot_dto.go`、`service/plot_service.go`（认养/释放/转交锁定状态机）、`repository/plot_repository.go`（过滤）、`util/formatters.go`、`log_templates.go`、`database/database.go`（种子数据）、`api/openapi.yaml`、前端 `constants/index.ts`（PlotStatusMeta / 地图配色 / 按钮显隐） |
+| TransferStatus 转交申请状态 | pending / approved / rejected / withdrawn | `constants/enums.go`（含 TransferStatusTransitions/CanTransferTo）、`model/plot_transfer.go`、`dto/plot_transfer_dto.go`、`service/plot_transfer_service.go`（提交/核准/驳回/撤回状态机）、`handler/plot_transfer_handler.go`、`repository/plot_transfer_repository.go`（部分唯一索引查询）、`util/formatters.go`、`error_codes.go`（2010/2011/2012）、`log_templates.go`、`api/openapi.yaml`、前端 `constants/index.ts`（TransferStatusMeta）、`pages/PlotMap.vue`、`pages/TransferApplications.vue` |
 | PlanStatus 种植计划状态 | planned / planting / growing / harvesting / completed | `constants/enums.go`、`model/planting_plan.go`、`dto/planting_plan_dto.go`（oneof 校验）、`service/planting_plan_service.go`（PlanStatusTransitions 状态机）、`handler/planting_plan_handler.go`、`util/formatters.go`、`log_templates.go`、`error_codes.go`（CodePlanStateNotAllowed）、`database/database.go`（种子数据）、前端 `constants/index.ts`（PlanStatusMeta / PlanStatusNext 按钮显隐） |
 | CropType 作物类型 | vegetable / fruit / herb | `constants/enums.go`、`model/planting_plan.go`、`dto/planting_plan_dto.go`、`service/planting_plan_service.go`（成熟时间估算）、`util/formatters.go`、`repository/harvest_record_repository.go`（分组统计）、`database/database.go` |
 | Season 季节 | spring / summer / autumn / winter | `constants/enums.go`、`dto/planting_plan_dto.go`、`service/planting_plan_service.go`（SeasonCrops 推荐表）、`util/formatters.go`、`database/database.go`、前端 `pages/PlantingPlan.vue`、`pages/Dashboard.vue` |
@@ -152,7 +154,12 @@ README.md
 | POST | `/plots` | 创建地块 | 管理员 |
 | PUT | `/plots/:id` | 更新地块 | 管理员 |
 | POST | `/plots/:id/adopt` | 认养地块（事务 + FOR UPDATE） | 登录 |
-| POST | `/plots/:id/release` | 释放地块 | 认养人/管理员 |
+| POST | `/plots/:id/release` | 管理员强制释放地块（认养人请走转交申请） | 管理员 |
+| POST | `/plots/:id/transfers` | 认养人提交转交申请（填写接管理由） | 认养人本人 |
+| GET | `/plot-transfers` | 转交申请列表（`?status=`） | 管理员 |
+| GET | `/plot-transfers/:id` | 转交申请详情（含原因/意见/状态） | 登录 |
+| POST | `/plot-transfers/:id/review` | 管理员核准/驳回（驳回必须带 comment） | 管理员 |
+| POST | `/plot-transfers/:id/withdraw` | 认养人撤回本人待处理申请 | 申请人本人 |
 
 ### 种植计划
 | 方法 | 路径 | 说明 | 鉴权 |
@@ -208,6 +215,15 @@ README.md
 - `GET /plots/:id`（地块详情接口）与创建种植计划 `POST /planting-plans` **复用同一个 service 方法** `PlotService.GetByID`。
 - 分页 `util.Paginate` 被全部 repository 复用；`ListByUser` 系列仓储方法被计划/收成列表接口复用。
 
+### 地块转交申请流程（防误触）
+1. 认养人在地块列表点击「申请转交」，填写**接管理由**后提交；地块状态由 `adopted/harvested` 变为 `pending_transfer`，认养关系保留，其他居民不能认养，也不能重复提交。
+2. 管理员在「转交申请」页（`/transfers`）查看：
+   - **核准**：申请变为 `approved`，事务内清空原认养关系（`adopter_id=NULL`），地块回到共享池（`available`）；
+   - **驳回**：必须填写**处理意见**，申请变为 `rejected`，地块恢复申请前状态，认养关系保留，认养人可再次提交。
+3. 核准前认养人可随时**撤回**（申请变为 `withdrawn`，地块恢复申请前状态）。
+4. 核准与撤回同时到来时，事务内对申请行 `SELECT ... FOR UPDATE`，只接受先完成的一次；后到的一次返回业务码 `2011`（已经处理）。数据库通过部分唯一索引 `idx_plot_transfers_pending`（`WHERE status='pending'`）兜底同一地块仅一条待处理申请。
+5. 地块列表与详情始终保留最近一次申请的**申请原因、处理意见、处理人与当前状态**。
+
 ## 🔌 API 调用示例（curl，含 JWT 请求头）
 
 ```bash
@@ -224,6 +240,24 @@ curl -s http://localhost:29516/api/v1/plots
 
 # 4. 认养地块（登录用户）
 curl -s -X POST http://localhost:29516/api/v1/plots/1/adopt \
+  -H "Authorization: Bearer $TOKEN"
+
+# 4b. 认养人提交转交申请（填写接管理由）
+curl -s -X POST http://localhost:29516/api/v1/plots/2/transfers \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"reason":"农忙季无暇打理，申请退回共享池由他人接管"}'
+
+# 4c. 认养人撤回自己的待处理申请
+curl -s -X POST http://localhost:29516/api/v1/plot-transfers/1/withdraw \
+  -H "Authorization: Bearer $TOKEN"
+
+# 4d. 管理员核准/驳回（驳回必须写明 comment）
+curl -s -X POST http://localhost:29516/api/v1/plot-transfers/1/review \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"approve":false,"comment":"当前轮作未结束，请收获后再申请"}'
+
+# 4e. 管理员查看转交申请列表（可按状态过滤）
+curl -s "http://localhost:29516/api/v1/plot-transfers?status=pending" \
   -H "Authorization: Bearer $TOKEN"
 
 # 5. 创建种植计划

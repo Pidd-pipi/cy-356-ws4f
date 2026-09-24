@@ -7,11 +7,28 @@ export const RoleText: Record<string, string> = {
   citizen: '城市居民'
 }
 
-export type PlotStatus = 'available' | 'adopted' | 'harvested'
+export type PlotStatus = 'available' | 'adopted' | 'harvested' | 'pending_transfer'
 export const PlotStatusMeta: Record<string, { label: string; type: 'success' | 'warning' | 'info' | 'danger' | 'primary' }> = {
   available: { label: '空闲可认养', type: 'success' },
   adopted: { label: '已认养', type: 'warning' },
-  harvested: { label: '待释放', type: 'info' }
+  harvested: { label: '待释放', type: 'info' },
+  pending_transfer: { label: '转交审核中', type: 'danger' }
+}
+
+// 转交申请状态机（与后端 TransferStatusTransitions 对应，驱动按钮显隐）
+export type TransferStatus = 'pending' | 'approved' | 'rejected' | 'withdrawn'
+export const TransferStatusMeta: Record<string, { label: string; type: 'success' | 'warning' | 'info' | 'danger' | 'primary' }> = {
+  pending: { label: '待处理', type: 'warning' },
+  approved: { label: '已核准', type: 'success' },
+  rejected: { label: '已驳回', type: 'danger' },
+  withdrawn: { label: '已撤回', type: 'info' }
+}
+// 终态集合：处于终态的申请不再允许任何操作（与后端 CanTransferTo 对应）
+export const TransferStatusTerminal: Record<string, boolean> = {
+  pending: false,
+  approved: true,
+  rejected: true,
+  withdrawn: true
 }
 
 export type PlanStatus = 'planned' | 'planting' | 'growing' | 'harvesting' | 'completed'

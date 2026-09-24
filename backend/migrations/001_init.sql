@@ -1,2 +1,8 @@
 -- 迁移脚本：与 database/init.sql 保持一致（GORM AutoMigrate 为运行时权威 schema）。
 -- 部署时数据库初始化由 docker-compose 挂载的 database/init.sql 完成。
+--
+-- 002 增量（地块转交申请）：
+--   新增表 plot_transfers；plots.status 新增取值 pending_transfer；
+--   新增部分唯一索引 idx_plot_transfers_pending（同一地块仅允许一条 pending 申请）。
+--   表结构由 GORM AutoMigrate 自动补齐，部分唯一索引由
+--   internal/database/migrations/indexes.go 的 ApplyCustomIndexes 执行。

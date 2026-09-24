@@ -8,6 +8,7 @@ servers:
 tags:
   - name: auth
   - name: plots
+  - name: plot-transfers
   - name: planting-plans
   - name: harvests
   - name: diaries
@@ -52,8 +53,40 @@ paths:
   /plots/{id}/release:
     post:
       tags: [plots]
-      summary: 释放地块
+      summary: 管理员强制释放地块（认养人请走转交申请流程）
       responses: { '200': { description: 成功 } }
+  /plots/{id}/transfers:
+    post:
+      tags: [plot-transfers]
+      summary: 认养人提交地块转交申请（填写接管理由，地块随即进入转交审核中）
+      responses: { '200': { description: 成功 } }
+  /plot-transfers:
+    get:
+      tags: [plot-transfers]
+      summary: 转交申请分页列表（管理员，可按 status 过滤）
+      responses: { '200': { description: 成功 } }
+  /plot-transfers/{id}:
+    get:
+      tags: [plot-transfers]
+      summary: 转交申请详情（登录）
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses: { '200': { description: 成功 } }
+  /plot-transfers/{id}/review:
+    post:
+      tags: [plot-transfers]
+      summary: 管理员核准/驳回转交申请（body: {approve: bool, comment: string}，驳回必须写明意见）
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200': { description: 成功 }
+        '409': { description: '申请已被先完成的一次操作处理（核准/撤回并发，后到者收到 2011 已经处理）' }
+  /plot-transfers/{id}/withdraw:
+    post:
+      tags: [plot-transfers]
+      summary: 认养人本人撤回待处理的转交申请（地块恢复申请前状态）
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200': { description: 成功 }
+        '409': { description: '申请已被管理员先核准时返回 2011 已经处理' }
   /planting-plans:
     get:
       tags: [planting-plans]

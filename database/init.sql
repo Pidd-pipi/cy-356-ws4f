@@ -32,6 +32,20 @@ CREATE TABLE IF NOT EXISTS plots (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS plot_transfers (
+    id BIGSERIAL PRIMARY KEY,
+    plot_id BIGINT NOT NULL REFERENCES plots(id),
+    applicant_id BIGINT NOT NULL REFERENCES users(id),
+    reason VARCHAR(512) NOT NULL,
+    status VARCHAR(32) NOT NULL DEFAULT 'pending',
+    previous_status VARCHAR(32) NOT NULL,
+    reviewer_id BIGINT REFERENCES users(id),
+    review_comment VARCHAR(512),
+    reviewed_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS planting_plans (
     id BIGSERIAL PRIMARY KEY,
     plot_id BIGINT NOT NULL REFERENCES plots(id),
@@ -119,6 +133,11 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 );
 
 CREATE INDEX IF NOT EXISTS idx_plots_status ON plots(status);
+CREATE INDEX IF NOT EXISTS idx_plot_transfers_plot ON plot_transfers(plot_id, status);
+CREATE INDEX IF NOT EXISTS idx_plot_transfers_applicant ON plot_transfers(applicant_id);
+CREATE INDEX IF NOT EXISTS idx_plot_transfers_reviewer ON plot_transfers(reviewer_id);
+-- 同一地块同时只允许一条待处理转交申请（核准/撤回竞态由数据库兜底）
+CREATE UNIQUE INDEX IF NOT EXISTS idx_plot_transfers_pending ON plot_transfers(plot_id) WHERE status = 'pending';
 CREATE INDEX IF NOT EXISTS idx_plans_user ON planting_plans(user_id);
 CREATE INDEX IF NOT EXISTS idx_plans_status ON planting_plans(status);
 CREATE INDEX IF NOT EXISTS idx_harvest_user ON harvest_records(user_id);

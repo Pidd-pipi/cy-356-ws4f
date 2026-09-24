@@ -20,12 +20,13 @@ func (r *Router) registerPlots(g *gin.RouterGroup) {
 	{
 		admin.POST("", r.plotHandler.Create)
 		admin.PUT("/:id", r.plotHandler.Update)
+		// 强制释放仅管理员：认养人释放地块必须走转交申请流程
+		admin.POST("/:id/release", r.plotHandler.Release)
 	}
 
 	auth := plots.Group("")
 	auth.Use(middleware.Auth(r.cfg, r.logger))
 	{
 		auth.POST("/:id/adopt", r.plotHandler.Adopt)
-		auth.POST("/:id/release", r.plotHandler.Release)
 	}
 }
